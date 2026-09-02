@@ -79,10 +79,23 @@ def cad_ve_moi(
     - KT_THANG (Bậc thang, tim thang)
     - KT_NOITHAT (Sofa, bàn ăn, bếp, bệt, lavabo)
     """
+    # 1. Sinh lệnh AutoCAD để VẼ TRỰC TIẾP LÊN BẢN VẼ ĐANG MỞ (Live Interactive CAD)
+    from autocad_ai.core.drawer import build_new_floor_plan_commands
+    cmds = build_new_floor_plan_commands(
+        width_mm=frontage_width_mm,
+        length_mm=depth_length_mm,
+        rooms=rooms,
+        wall_ext_mm=wall_ext_mm,
+        wall_int_mm=wall_int_mm,
+        include_furniture=include_furniture,
+        origin_x=origin_x,
+        origin_y=origin_y,
+    )
+    dispatch_res = dispatch_to_autocad_mac(cmds)
+
+    # 2. Đồng thời lưu bản sao Master DXF để backup dữ liệu
     dxf_path = os.path.expanduser("~/.autocad_ai/mat_bang_moi.dxf")
     os.makedirs(os.path.dirname(dxf_path), exist_ok=True)
-    
-    # 1. Tạo bản vẽ DXF
     draw_floor_plan_to_dxf(
         filepath=dxf_path,
         width_mm=frontage_width_mm,
@@ -95,18 +108,12 @@ def cad_ve_moi(
         origin_y=origin_y,
     )
     
-    # 2. Render ảnh PNG tĩnh từ DXF để user xem trước
-    try:
-        png_res = export_to_png(dxf_path, dpi=150)
-        png_path = png_res.get("output_path", "")
-    except Exception as e:
-        png_path = f"Lỗi tạo PNG: {str(e)}"
-
-    # 3. Mở file DXF bằng AutoCAD trực tiếp (chạy ngầm lệnh open)
-    open_res = open_dxf_in_autocad_mac(dxf_path)
-    open_res["preview_png"] = png_path
-    
-    return open_res
+    return {
+        "status": "success",
+        "message": "Đã vẽ trực tiếp trên bản vẽ AutoCAD đang mở thành công!",
+        "dispatch_details": dispatch_res,
+        "backup_dxf": dxf_path,
+    }
 
 
 # ============================================================================

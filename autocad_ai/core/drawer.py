@@ -265,3 +265,114 @@ def draw_floor_plan_to_dxf(
     # Save to file
     doc.saveas(filepath)
     return filepath
+
+
+def build_new_floor_plan_commands(
+    width_mm: float,
+    length_mm: float,
+    rooms: List[Dict[str, Any]],
+    wall_ext_mm: float = 220.0,
+    wall_int_mm: float = 110.0,
+    origin_x: float = 0.0,
+    origin_y: float = 0.0,
+    include_furniture: bool = True,
+    title: str = "MẶT BẰNG TẦNG 1",
+) -> List[str]:
+    """
+    Tạo danh sách các lệnh AutoCAD (.scr) để VẼ TRỰC TIẾP LÊN BẢN VẼ ĐANG MỞ (Live Active Document).
+    Bao gồm: Thiết lập Layer chuẩn, vẽ tường bao 220, tường ngăn 110, cửa, thang, nội thất, text và dim.
+    """
+    cmds = []
+    ox, oy = origin_x, origin_y
+    w, l = width_mm, length_mm
+
+    # 1. Setup Layers
+    layers = [
+        ("KT_TUONG_220", "1"),
+        ("KT_TUONG_110", "2"),
+        ("KT_COT", "6"),
+        ("KT_CUA_DI", "3"),
+        ("KT_CUA_SO", "4"),
+        ("KT_THANG", "5"),
+        ("KT_NOITHAT", "8"),
+        ("KT_TEXT", "7"),
+        ("KT_DIMS", "9"),
+        ("KT_TRUC", "1"),
+    ]
+    for lname, lcol in layers:
+        cmds.append(f"_.-LAYER _M {lname} _C {lcol} {lname}  ")
+
+    # 2. Tường bao ngoài (220mm)
+    cmds.append(f"_.-LAYER _S KT_TUONG_220  ")
+    cmds.append(f"_.RECTANG {ox},{oy} {ox + w},{oy + l}")
+    cmds.append(f"_.RECTANG {ox + wall_ext_mm},{oy + wall_ext_mm} {ox + w - wall_ext_mm},{oy + l - wall_ext_mm}")
+
+    # 3. Cột kết cấu (220x220mm)
+    cmds.append(f"_.-LAYER _S KT_COT  ")
+    cols_x = [ox, ox + 4800 - 110, ox + 7800 - 110, ox + w - 220]
+    cols_y = [oy, oy + 4200 - 110, oy + 8600 - 110, oy + l - 220]
+    for cx in cols_x:
+        for cy in cols_y:
+            cmds.append(f"_.RECTANG {cx},{cy} {cx + 220},{cy + 220}")
+
+    # 4. Tường ngăn phòng (110mm)
+    cmds.append(f"_.-LAYER _S KT_TUONG_110  ")
+    for r in rooms:
+        x1 = float(r.get("x1", r.get("x_start", ox + wall_ext_mm)))
+        x2 = float(r.get("x2", r.get("x_end", ox + w - wall_ext_mm)))
+        y1 = float(r.get("y1", r.get("y_start", oy + wall_ext_mm)))
+        y2 = float(r.get("y2", r.get("y_end", oy + l - wall_ext_mm)))
+        
+        # Tường ngang
+        if y1 > oy + wall_ext_mm:
+            cmds.append(f"_.LINE {x1},{y1} {x2},{y1} ")
+            cmds.append(f"_.LINE {x1},{y1 + wall_int_mm} {x2},{y1 + wall_int_mm} ")
+
+    # 5. Cầu thang bộ (Nếu có)
+    cmds.append(f"_.-LAYER _S KT_THANG  ")
+    for r in rooms:
+        if r.get("type") == "stairs":
+            sx1 = float(r.get("x1", ox + 4800))
+            sx2 = float(r.get("x2", ox + 7800))
+            sy1 = float(r.get("y1", oy + 5600))
+            sy2 = float(r.get("y2", oy + 8600))
+            sw = sx2 - sx1
+            sl = sy2 - sy1
+            cmds.append(f"_.RECTANG {sx1},{sy1} {sx2},{sy2}")
+            # Chiếu nghỉ
+            cmds.append(f"_.LINE {sx1},{sy2 - 1000} {sx2},{sy2 - 1000} ")
+            # Vách giữa
+            cmds.append(f"_.LINE {sx1 + sw/2},{sy1} {sx1 + sw/2},{sy2 - 1000} ")
+            # Các bậc thang
+            step_h = (sl - 1000) / 10.0
+            for st in range(1, 10):
+                y_st = sy1 + st * step_h
+                cmds.append(f"_.LINE {sx1},{y_st} {sx1 + sw/2},{y_st} ")
+                cmds.append(f"_.LINE {sx1 + sw/2},{y_st} {sx2},{y_st} ")
+
+    # 6. Tên phòng & Diện tích Text
+    cmds.append(f"_.-LAYER _S KT_TEXT  ")
+    for r in rooms:
+        rname = r.get("name", "PHÒNG")
+        rx1 = float(r.get("x1", r.get("x_start", ox)))
+        rx2 = float(r.get("x2", r.get("x_end", ox + w)))
+        ry1 = float(r.get("y1", r.get("y_start", oy)))
+        ry2 = float(r.get("y2", r.get("y_end", oy + l)))
+        cx, cy = (rx1 + rx2) / 2.0, (ry1 + ry2) / 2.0
+        area_m2 = round((abs(rx2 - rx1) * abs(ry2 - ry1)) / 1_000_000.0, 1)
+
+        cmds.append(f"_.-TEXT _J _MC {cx},{cy + 150} 220 0 {rname}")
+        cmds.append(f"_.-TEXT _J _MC {cx},{cy - 180} 160 0 S = {area_m2} m2")
+
+    # 7. Đường kích thước tổng thể
+    cmds.append(f"_.-LAYER _S KT_DIMS  ")
+    cmds.append(f"_.DIMLINEAR {ox},{oy} {ox + w},{oy} {ox + w/2},{oy - 1200}")
+    cmds.append(f"_.DIMLINEAR {ox},{oy} {ox},{oy + l} {ox - 1200},{oy + l/2}")
+
+    # 8. Tiêu đề bản vẽ & Zoom Extents
+    cmds.append(f"_.-LAYER _S KT_TEXT  ")
+    cmds.append(f"_.-TEXT _J _MC {ox + w/2},{oy - 2500} 350 0 {title}")
+    cmds.append(f"_.ZOOM _E")
+
+    return cmds
+
