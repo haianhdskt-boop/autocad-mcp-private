@@ -59,110 +59,84 @@ def is_autocad_running_mac() -> bool:
     return False
 
 
-def dispatch_to_autocad_mac(commands: List[str]) -> Dict[str, Any]:
-    """Execute command list directly in active AutoCAD / ZWCAD / BricsCAD for Mac.
-
-    Workflow:
-    1. Ghi danh sách lệnh vào file .scr
-    2. Activate cửa sổ CAD
-    3. Dùng clipboard paste gõ lệnh _FILEDIA 0 (tắt dialog)
-    4. Paste lệnh _SCRIPT + đường dẫn file .scr
-    5. Bật lại _FILEDIA 1 sau khi xong
-    """
+def dispatch_to_autocad_mac(commands: List[str], batch_size: int = 25) -> Dict[str, Any]:
+    """Execute command list directly in active AutoCAD / ZWCAD / BricsCAD for Mac via direct AppleScript keystrokes."""
     if not commands:
         return {"status": "error", "message": "No commands provided"}
-
-    cmd_dir = os.path.expanduser("~/.autocad_ai")
-    os.makedirs(cmd_dir, exist_ok=True)
-    scr_file = os.path.join(cmd_dir, "live_command.scr")
-
-    # Giữ lại blank lines cho TEXT command termination
-    scr_lines = []
-    for cmd in commands:
-        if cmd.strip() == "":
-            scr_lines.append("")  # Blank line = Enter (exit TEXT/LINE)
-        else:
-            scr_lines.append(cmd.strip())
-    scr_content = "\n".join(scr_lines) + "\n\n"
-
-    with open(scr_file, "w", encoding="utf-8") as f:
-        f.write(scr_content)
 
     is_running = is_autocad_running_mac()
     if not is_running:
         return {
             "status": "warning",
-            "message": "Phần mềm CAD (AutoCAD/ZWCAD/BricsCAD) chưa mở. File kịch bản đã được lưu sẵn.",
-            "script_file": scr_file,
-            "command_count": len([l for l in scr_lines if l.strip()]),
-            "how_to_run": f"Mở CAD lên -> Gõ lệnh 'SCRIPT' -> Chọn file '{scr_file}'",
+            "message": "Phần mềm CAD (AutoCAD/ZWCAD/BricsCAD) chưa mở. Vui lòng mở CAD trước.",
+            "command_count": len(commands),
         }
 
     try:
-        # Step 1: Activate CAD window
-        activate_script = '''
-        tell application "System Events"
-            set cadProc to (first process whose name contains "AutoCAD" \
-                or name contains "ZWCAD" or name contains "BricsCAD")
-            set frontmost of cadProc to true
-            delay 0.5
-            -- Raise the drawing window (not dialogs)
-            repeat with w in windows of cadProc
-                if name of w contains ".dwg" or name of w contains "Drawing" then
-                    try
-                        perform action "AXRaise" of w
-                    end try
-                    exit repeat
-                end if
-            end repeat
-            delay 0.3
-        end tell
-        '''
-        subprocess.run(["osascript", "-e", activate_script],
-                        capture_output=True, text=True, timeout=5)
+        import time
 
-        # Step 2: Gửi phím trực tiếp bằng AppleScript Keystroke vào AutoCAD Command Bar
-        keystroke_script = f'''
+        # 1. Activate CAD và Escape lệnh cũ
+        init_script = '''
         tell application "System Events"
             set cadProc to (first process whose name contains "AutoCAD" \
                 or name contains "ZWCAD" or name contains "BricsCAD")
             set frontmost of cadProc to true
-            delay 0.3
-            -- Cancel any pending command with Escape
-            key code 53
+            delay 0.2
+            key code 53 -- Escape
             delay 0.1
             key code 53
-            delay 0.2
-            -- Tắt hộp thoại file để nhận đường dẫn qua command line
-            keystroke "_FILEDIA" & return
-            delay 0.1
-            keystroke "0" & return
-            delay 0.2
-            -- Nạp và chạy file script kịch bản trực tiếp
-            keystroke "_SCRIPT" & return
-            delay 0.2
-            keystroke "{scr_file}" & return
-            delay 0.8
-            -- Bật lại dialog
-            keystroke "_FILEDIA" & return
-            delay 0.1
-            keystroke "1" & return
-            delay 0.2
-            -- Zoom Extents
-            keystroke "._zoom" & return
-            delay 0.1
-            keystroke "_e" & return
         end tell
         '''
-        res = subprocess.run(["osascript", "-e", keystroke_script],
-                             capture_output=True, text=True, timeout=15)
+        subprocess.run(["osascript", "-e", init_script], capture_output=True, text=True, timeout=5)
+        time.sleep(0.2)
+
+        # 2. Gửi từng batch lệnh CAD trực tiếp
+        total = len(commands)
+        for i in range(0, total, batch_size):
+            batch = commands[i:i + batch_size]
+            lines = []
+            for cmd in batch:
+                c = cmd.strip()
+                if not c:
+                    lines.append('keystroke return')
+                else:
+                    escaped = c.replace('"', '\\"')
+                    lines.append(f'keystroke "{escaped}" & return')
+            
+            batch_script = f'''
+            tell application "System Events"
+                set cadProc to (first process whose name contains "AutoCAD" \
+                    or name contains "ZWCAD" or name contains "BricsCAD")
+                set frontmost of cadProc to true
+                {chr(10).join(lines)}
+            end tell
+            '''
+            subprocess.run(["osascript", "-e", batch_script], capture_output=True, text=True, timeout=10)
+            time.sleep(0.12)
+
+        # 3. Zoom Extents
+        final_script = '''
+        tell application "System Events"
+            set cadProc to (first process whose name contains "AutoCAD" \
+                or name contains "ZWCAD" or name contains "BricsCAD")
+            set frontmost of cadProc to true
+            delay 0.2
+            key code 53
+            keystroke "._zoom _e" & return
+        end tell
+        '''
+        subprocess.run(["osascript", "-e", final_script], capture_output=True, text=True, timeout=5)
 
         return {
             "status": "success",
-            "message": "Đã thực thi trực tiếp trên màn hình AutoCAD đang mở qua AppleScript Keystroke.",
-            "command_count": len([l for l in scr_lines if l.strip()]),
-            "script_file": scr_file,
-            "osascript_result": res.returncode,
+            "message": "Đã vẽ trực tiếp từng nét lên màn hình AutoCAD đang mở qua Direct AppleScript Keystroke!",
+            "command_count": total,
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Lỗi dispatch lệnh trực tiếp: {str(e)}",
         }
 
     except Exception as e:
