@@ -185,27 +185,27 @@ Trích xuất tức thì hướng dẫn chi tiết từ kho 7 chuyên đề ki�
 
 ## 📊 TRẠNG THÁI HIỆN TẠI & ĐỊNH HƯỚNG PHÁT TRIỂN TIẾP THEO
 
-### ✅ NHỮNG NỘI DUNG ĐÃ HOÀN THÀNH:
-1. **Kiến trúc MCP Server Đa Nền Tảng**: Hỗ trợ 100% AutoCAD 2021-2026 trên macOS (AutoLISP/AppleScript) và Windows (COM ActiveX).
-2. **Trọn bộ 8 Lệnh Nghiệp Vụ Tiếng Việt**: `cad_ve_moi`, `cad_chinh_sua`, `cad_hoan_thien_ho_so`, `cad_du_toan`, `cad_kiem_tra`, `cad_gui_lenh`, `cad_in_pdf`, `cad_tra_cuu_quy_chuan`.
-3. **Đóng gói Thư viện Quy chuẩn Kiến trúc**: Tích hợp toàn bộ kho tri thức `architecture-reference-library` trực tiếp vào `autocad_ai/knowledge/`.
-4. **Bộ 2 Quy Trình SOP Tiêu Chuẩn**: Thiết kế mới 5 bước (có bước KTS duyệt chốt trước khi vẽ) và Chỉnh sửa 4 bước.
-5. **Ràng buộc Chống Chồng Đè (Zero-Overlap)**: Đồ nội thất không đè tường, chữ/ghi chú/DIM không đè lên nhau.
-6. **Động hóa Hồ sơ & Cầu thang**: Cổ bậc thang $h=H/N$, mặt bậc $b=250/270\text{mm}$, phân trang động cửa tối đa 3-4 bộ/A3.
-7. **Xuất PDF & Dự toán Chi tiết**: In PDF A3 đen trắng chuẩn nét kỹ thuật, bóc dự toán xuất file Excel/CSV.
-8. **Kiểm thử tự động**: 16/16 bài unit test (`pytest`) Passed 100%.
+### ✅ NHỮNG NỘI DUNG ĐÃ HOÀN THÀNH (Tính đến hiện tại):
+1. **Kiến trúc DXF-First Architecture (Platform Agnostic)**: Chuyển đổi hoàn toàn từ "Live-Scripting" sang sinh file `.dxf` bằng `ezdxf` chạy ngầm. AutoCAD giờ chỉ đóng vai trò "Trình Đọc Bản Vẽ", loại bỏ 100% rủi ro lỗi đánh máy do bộ gõ tiếng Việt (Unikey/Telex) trên cả macOS và Windows.
+2. **Kiểm soát va chạm hình học (Zero-Overlap)**: Bổ sung module `autocad_ai/core/geometry.py` với sức mạnh từ thư viện `shapely` để tự động kiểm tra và đảm bảo không có đồ nội thất hay mảng tường nào đè lên nhau.
+3. **Kiến trúc MCP Server Đa Nền Tảng**: Hỗ trợ xuất DXF và tự động mở AutoCAD ngầm định trên macOS (`open`) và Windows (`os.startfile`).
+4. **Trọn bộ 8 Lệnh Nghiệp Vụ Tiếng Việt**: `cad_ve_moi`, `cad_chinh_sua`, `cad_hoan_thien_ho_so`, `cad_du_toan`, `cad_kiem_tra`, `cad_gui_lenh`, `cad_in_pdf`, `cad_tra_cuu_quy_chuan`.
+5. **Đóng gói Thư viện Quy chuẩn Kiến trúc**: Tích hợp toàn bộ kho tri thức `architecture-reference-library` trực tiếp vào `autocad_ai/knowledge/`.
+6. **Bộ 2 Quy Trình SOP Tiêu Chuẩn**: Thiết kế mới 5 bước (có bước KTS duyệt chốt trước khi vẽ) và Chỉnh sửa 4 bước.
+7. **Động hóa Hồ sơ & Cầu thang**: Cổ bậc thang $h=H/N$, mặt bậc $b=250/270\text{mm}$, phân trang động cửa tối đa 3-4 bộ/A3.
+8. **Xuất PDF tĩnh (Preview) & Dự toán Chi tiết**: Render PNG tĩnh từ DXF cho MCP xem trước, bóc dự toán xuất file Excel/CSV.
 
 ---
 
 ### ⏳ NỘI DUNG CHƯA LÀM & ĐỊNH HƯỚNG BỔ SUNG TIẾP THEO:
-1. **Chuẩn Hóa Bộ Template CAD (`.dwt`) & Thư Viện Block Riêng**:
-   - Khi bạn cung cấp các file mẫu `.dwg` / `.dwt` của văn phòng, hệ thống sẽ tích hợp để chèn các Block thực tế (Cửa nhôm kính Xingfa, Cửa gỗ Lim, Bệt Inax/Toto, Sofa góc chữ L, Khung tên riêng của công ty) thay vì vẽ nét vector hình học.
-2. **Lệnh Chèn Block Chuyên Nghiệp (`cad_chen_block`)**:
-   - Tự động gọi `_.INSERT` và gán thuộc tính Attribute cho Block cửa, thiết bị nội thất.
-3. **Bảng Thống Kê Động Liên Kết 2 Chiều (Data Extraction)**:
+1. **Chuẩn Hóa Bộ Template CAD (`.dwt`) & Thư Viện Block Riêng (ƯU TIÊN TIẾP THEO)**:
+   - Khi KTS cung cấp các file mẫu `.dwg` / `.dwt` của văn phòng, hệ thống sẽ tích hợp để chèn các Block thực tế (Cửa nhôm kính Xingfa, Cửa gỗ Lim, Bệt Inax/Toto, Sofa góc chữ L, Khung tên riêng của công ty) thay vì vẽ nét vector hình học cơ bản.
+2. **Triển Khai Bản Vẽ Tầng 2, Tầng 3 & Mái**:
+   - Mở rộng logic `drawer.py` để hỗ trợ xếp chồng các bản vẽ tầng, kế thừa trục cột và tim tường từ Tầng 1.
+3. **Lệnh Chèn Block Chuyên Nghiệp (`cad_chen_block`)**:
+   - Tự động gọi chèn Block và gán thuộc tính Attribute cho Block cửa, thiết bị nội thất.
+4. **Bảng Thống Kê Động Liên Kết 2 Chiều (Data Extraction)**:
    - Trích xuất bảng thống kê cửa trực tiếp từ Block Attribute trong AutoCAD và xuất ra Excel.
-4. **Giao Diện Trực Quan Hóa (3D / Isometric Web Viewer)**:
-   - Module xem nhanh hình khối 3D phối cảnh công trình trực tiếp trên trình duyệt trước khi xuất bản vẽ thi công.
 
 ---
 

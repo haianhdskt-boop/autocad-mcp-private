@@ -108,3 +108,29 @@ def dispatch_to_autocad_win(commands: List[str]) -> Dict[str, Any]:
             "status": "error",
             "message": f"Failed to execute commands on AutoCAD Windows: {str(e)}",
         }
+
+
+def open_dxf_in_autocad_win(dxf_path: str) -> Dict[str, Any]:
+    """Open a DXF file directly on Windows using os.startfile."""
+    if not os.path.exists(dxf_path):
+        return {"status": "error", "message": f"File not found: {dxf_path}"}
+    
+    if not is_windows():
+        return {
+            "status": "warning",
+            "message": f"Không phải Windows. Tệp DXF đã lưu tại: {dxf_path}",
+            "dxf_file": dxf_path
+        }
+    
+    try:
+        os.startfile(dxf_path)
+        return {
+            "status": "success",
+            "message": f"Đã xuất file DXF và gọi Windows mở tệp {dxf_path} (chạy ngầm, không gõ phím).",
+            "dxf_file": dxf_path
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Lỗi khi mở tệp trên Windows: {str(e)}"
+        }

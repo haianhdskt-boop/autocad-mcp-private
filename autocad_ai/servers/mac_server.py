@@ -3,13 +3,15 @@
 from typing import Dict, Any, List, Optional
 from fastmcp import FastMCP
 
-from autocad_ai.core.drawer import build_new_floor_plan_commands
+import os
+from autocad_ai.core.drawer import draw_floor_plan_to_dxf
 from autocad_ai.core.modifier import build_modify_commands
 from autocad_ai.core.finalizer import build_finalized_sheets_commands
 from autocad_ai.core.estimator import calculate_detailed_construction_boq
 from autocad_ai.core.inspector import check_room_clear_dimensions, audit_full_floor_plan, build_inspection_commands
 from autocad_ai.core.plotter import build_plot_single_sheet_commands, build_batch_plot_commands
-from autocad_ai.drivers.mac_driver import dispatch_to_autocad_mac, is_autocad_running_mac
+from autocad_ai.drivers.mac_driver import dispatch_to_autocad_mac, is_autocad_running_mac, open_dxf_in_autocad_mac
+from autocad_mcp.services.dxf_renderer import export_to_png
 
 SERVER_INSTRUCTIONS = """AutoCAD AI Professional Architect Suite (macOS).
 
@@ -77,7 +79,12 @@ def cad_ve_moi(
     - KT_THANG (Bậc thang, tim thang)
     - KT_NOITHAT (Sofa, bàn ăn, bếp, bệt, lavabo)
     """
-    cmds = build_new_floor_plan_commands(
+    dxf_path = os.path.expanduser("~/.autocad_ai/mat_bang_moi.dxf")
+    os.makedirs(os.path.dirname(dxf_path), exist_ok=True)
+    
+    # 1. Tạo bản vẽ DXF
+    draw_floor_plan_to_dxf(
+        filepath=dxf_path,
         width_mm=frontage_width_mm,
         length_mm=depth_length_mm,
         rooms=rooms,
@@ -87,7 +94,19 @@ def cad_ve_moi(
         origin_x=origin_x,
         origin_y=origin_y,
     )
-    return dispatch_to_autocad_mac(cmds)
+    
+    # 2. Render ảnh PNG tĩnh từ DXF để user xem trước
+    try:
+        png_res = export_to_png(dxf_path, dpi=150)
+        png_path = png_res.get("output_path", "")
+    except Exception as e:
+        png_path = f"Lỗi tạo PNG: {str(e)}"
+
+    # 3. Mở file DXF bằng AutoCAD trực tiếp (chạy ngầm lệnh open)
+    open_res = open_dxf_in_autocad_mac(dxf_path)
+    open_res["preview_png"] = png_path
+    
+    return open_res
 
 
 # ============================================================================
