@@ -5,7 +5,7 @@ import pytest
 import tempfile
 import asyncio
 
-from autocad_ai.core.drawer import build_new_floor_plan_commands
+from autocad_ai.core.drawer import draw_floor_plan_to_dxf
 from autocad_ai.core.modifier import build_modify_commands
 from autocad_ai.core.finalizer import (
     build_finalized_sheets_commands,
@@ -20,20 +20,27 @@ from autocad_ai.servers.mac_server import mcp as mac_mcp
 from autocad_ai.servers.win_server import mcp as win_mcp
 
 
-def test_drawer_commands():
-    """Test generating commands for new floor plan."""
+def test_drawer_dxf_generation():
+    """Test generating DXF floor plan."""
     rooms = [
         {"name": "Phòng Khách", "y_start": 2500, "y_end": 7000, "type": "living"},
         {"name": "Cầu Thang", "y_start": 7000, "y_end": 9500, "type": "stairs"},
     ]
-    cmds = build_new_floor_plan_commands(width_mm=5000, length_mm=15000, rooms=rooms)
-    cmd_str = " ".join(cmds)
+    with tempfile.NamedTemporaryFile(suffix=".dxf", delete=False) as tf:
+        dxf_path = tf.name
 
-    assert "KT_TUONG_220" in cmd_str
-    assert "KT_TUONG_110" in cmd_str
-    assert "_.RECTANG" in cmd_str
-    assert "Phòng Khách" in cmd_str
-    assert "KT_THANG" in cmd_str
+    try:
+        res_path = draw_floor_plan_to_dxf(
+            filepath=dxf_path,
+            width_mm=5000,
+            length_mm=15000,
+            rooms=rooms
+        )
+        assert os.path.exists(res_path)
+        assert os.path.getsize(res_path) > 1000
+    finally:
+        if os.path.exists(dxf_path):
+            os.remove(dxf_path)
 
 
 def test_modifier_commands():

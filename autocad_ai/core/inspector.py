@@ -16,23 +16,32 @@ def check_room_clear_dimensions(
     min_w = min(length_mm, width_mm)
 
     std = SPACE_STANDARDS.get(room_type.lower())
-    if not std:
-        # Fallback mappings
+    # Fallback / Normalization
+    if "corridor" in room_type.lower() or "hanh_lang" in room_type.lower():
+        min_area = 1.0
+        min_width_limit = 900.0
+        std = {"name": "Hành Lang & Lối Đi", "min_area_m2": min_area, "min_width_mm": min_width_limit}
+    elif "stairs" in room_type.lower() or "thang" in room_type.lower():
+        min_area = 4.0
+        min_width_limit = 900.0
+        std = {"name": "Cầu Thang Bộ", "min_area_m2": min_area, "min_width_mm": min_width_limit}
+    elif not std:
         if "master" in room_type.lower():
-            std = SPACE_STANDARDS["bedroom_master"]
+            std = SPACE_STANDARDS.get("bedroom_master", {})
         elif "bedroom" in room_type.lower() or "ngu" in room_type.lower():
-            std = SPACE_STANDARDS["bedroom_single"]
+            std = SPACE_STANDARDS.get("bedroom_single", {})
         elif "kitchen" in room_type.lower() or "bep" in room_type.lower():
-            std = SPACE_STANDARDS["kitchen"]
+            std = SPACE_STANDARDS.get("kitchen", {})
         elif "wc" in room_type.lower() or "bath" in room_type.lower():
-            std = SPACE_STANDARDS["wc_standard"]
-        elif "corridor" in room_type.lower() or "hanh_lang" in room_type.lower():
-            std = {"name": "Hành Lang", "min_area_m2": 1.0, "min_width_mm": 900.0}
+            std = SPACE_STANDARDS.get("wc_standard", {})
         else:
             std = {"name": "Phòng Tiêu Chuẩn", "min_area_m2": 6.0, "min_width_mm": 2000.0}
 
-    min_area = std.get("min_area_m2", 6.0)
-    min_width_limit = std.get("min_width_mm", 2000.0)
+        min_area = std.get("min_area_m2", 6.0)
+        min_width_limit = std.get("min_width_mm", 2000.0)
+    else:
+        min_area = std.get("min_area_m2", 1.0 if "corridor" in room_type.lower() else 6.0)
+        min_width_limit = std.get("min_width_mm", std.get("sub_corridor_min_width_mm", 2000.0))
 
     passed_area = area_m2 >= min_area
     passed_width = min_w >= min_width_limit
@@ -83,12 +92,23 @@ def check_drafting_hygiene_overlaps(
         if y2 - y1 < 1000.0:
             issues.append(f"Không gian '{r_name}' quá hẹp ({y2-y1}mm), nguy cơ đồ nội thất đè vào tường.")
 
-    # 2. Text bounding checks (Check duplicate or overlapping text Y positions)
-    y_positions = [float(r.get("y_start", 0)) for r in rooms]
-    for i in range(len(y_positions)):
-        for j in range(i + 1, len(y_positions)):
-            if abs(y_positions[i] - y_positions[j]) < 400.0:
-                issues.append(f"Cảnh báo khoảng cách giữa 2 phòng '{rooms[i].get('name')}' và '{rooms[j].get('name')}' quá gần (< 400mm), nguy cơ đè chữ ghi chú.")
+    # 2. Text bounding checks (Kiểm tra khoảng cách tâm nhãn chữ 2D giữa các phòng)
+    for i in range(len(rooms)):
+        r1 = rooms[i]
+        x1_a, x2_a = float(r1.get("x1", r1.get("x_start", 0))), float(r1.get("x2", r1.get("x_end", width_mm)))
+        y1_a, y2_a = float(r1.get("y1", r1.get("y_start", 0))), float(r1.get("y2", r1.get("y_end", length_mm)))
+        cx_a, cy_a = (x1_a + x2_a) / 2.0, (y1_a + y2_a) / 2.0
+
+        for j in range(i + 1, len(rooms)):
+            r2 = rooms[j]
+            x1_b, x2_b = float(r2.get("x1", r2.get("x_start", 0))), float(r2.get("x2", r2.get("x_end", width_mm)))
+            y1_b, y2_b = float(r2.get("y1", r2.get("y_start", 0))), float(r2.get("y2", r2.get("y_end", length_mm)))
+            cx_b, cy_b = (x1_b + x2_b) / 2.0, (y1_b + y2_b) / 2.0
+
+            # Khoảng cách 2D giữa 2 nhãn chữ tâm phòng
+            dist_2d = ((cx_a - cx_b) ** 2 + (cy_a - cy_b) ** 2) ** 0.5
+            if dist_2d < 600.0:
+                issues.append(f"Cảnh báo khoảng cách giữa 2 nhãn phòng '{r1.get('name')}' và '{r2.get('name')}' quá gần ({dist_2d:.0f}mm < 600mm), nguy cơ đè chữ ghi chú.")
 
     if not issues:
         passed.append("✅ Không phát hiện đồ nội thất đè vào tường (giữ khoảng hở an toàn >= 100mm).")

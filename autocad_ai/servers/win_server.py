@@ -411,14 +411,42 @@ def cad_tra_cuu_quy_chuan(
     elif action == "get_topic":
         doc = get_full_topic_document(query)
         return doc or {"error": f"Không tìm thấy chuyên đề '{query}'"}
-    else:  # get_room
         return get_room_guidelines(query)
 
 
+# ============================================================================
+# 9. HỘI ĐỒNG KIẾN TRÚC ĐA TÁC TỬ HỌP & PHẢN BIỆN (cad_hop_phuong_an)
+# ============================================================================
 
-# ============================================================================
-# WORKFLOW PROMPTS (QUY TRÌNH CHUẨN)
-# ============================================================================
+
+@mcp.tool()
+def cad_hop_phuong_an(
+    project_brief_text: str,
+    width_m: float = 12.0,
+    length_m: float = 12.0,
+    num_floors: int = 3,
+    land_width_m: float = 30.0,
+    land_length_m: float = 30.0,
+    main_orientation: str = "Tây Nam",
+) -> Dict[str, Any]:
+    """Khai mạc phiên họp Hội Đồng Kiến Trúc Đa Tác Tử (KTS Ý Tưởng, KTS Phản Biện QC, Kỹ Sư Kết Cấu/MEP).
+    
+    Tự động tranh luận, rà soát tính liên thông giao thông, lưới cột, và chốt phương án tối ưu trước khi vẽ.
+    """
+    from autocad_ai.agents.council_orchestrator import ArchitecturalCouncilOrchestrator
+    
+    council = ArchitecturalCouncilOrchestrator()
+    brief = {
+        "brief_text": project_brief_text,
+        "width_m": width_m,
+        "length_m": length_m,
+        "num_floors": num_floors,
+        "land_size_m": [land_width_m, land_length_m],
+        "main_orientation": main_orientation,
+    }
+    
+    session_result = council.convene_council_session(brief, max_rounds=3)
+    return session_result
 
 
 @mcp.prompt()

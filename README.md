@@ -100,29 +100,38 @@ irm https://raw.githubusercontent.com/haianhdskt-boop/autocad-ai-mcp/main/instal
 
 ---
 
-## 🏛️ TRỌN BỘ 8 LỆNH NGHIỆP VỤ TIẾNG VIỆT (KHÔNG DẤU)
+## 🏛️ HỘI ĐỒNG KIẾN TRÚC ĐA TÁC TỬ (MULTI-AGENT ARCHITECTURE)
+
+Hệ thống được vận hành bởi **5 Chuyên Gia AI Chuyên Môn Hóa** với cơ chế tranh luận & phản biện độc lập:
+1. **`KTS_Concept` (Ý Tưởng & Phân Bổ Không Gian)**: Tổ chức dây chuyền công năng, vi khí hậu, hướng gió & view cảnh quan.
+2. **`KTS_Inspector_QC` (Phản Biện & Thẩm Định Độc Lập)**: "Vạch lá tìm sâu", kiểm tra đồ thị giao thông (chống bít lối đi), công thái học Neufert, QCVN 04, zero-overlap.
+3. **`KySu_KetCau_MEP` (Kết Cấu & Kỹ Thuật Công Trình)**: Tối ưu lưới cột chịu lực (bỏ cột thừa), trục đứng cấp thoát nước.
+4. **`HoaVien_CAD_Operator` (Họa Viên CAD Trưởng)**: Quản trị Layer, Block, DIM 3 tầng, điều khiển AutoCAD theo thời gian thực.
+5. **`HoiDong_KienTruc` (Chủ Trì & Điều Phối)**: Chạy vòng lặp phản biện (Debate Loops), tối ưu hóa đạt $\ge 9.5/10$ điểm trước khi trình KTS duyệt.
+
+---
+
+## 🏛️ TRỌN BỘ 9 LỆNH NGHIỆP VỤ TIẾNG VIỆT (KHÔNG DẤU)
 
 ```
                   ┌─────────────────────────────────────────────────────────────┐
-                  │            TRỢ LÝ AI ĐIỀU KHIỂN AUTOCAD TRỰC TIẾP           │
+                  │            HỘI ĐỒNG AI ĐIỀU KHIỂN AUTOCAD TRỰC TIẾP         │
                   └──────────────┬───────────────────────────────┬──────────────┘
                                  │                               │
-            GIAI ĐOẠN THIẾT KẾ & SỬA ĐỔI            GIAI ĐOẠN HỒ SƠ, DỰ TOÁN & IN ẤN
+            GIAI ĐOẠN PHẢN BIỆN & THIẾT KẾ          GIAI ĐOẠN HỒ SƠ, DỰ TOÁN & IN ẤN
             ┌────────────────────────────┐          ┌────────────────────────────┐
-            │ 1. ✍️ cad_ve_moi           │          │ 3. 📐 cad_hoan_thien_ho_so │
-            │ (Vẽ mới không gian/tường)  │          │ (Dàn trang động theo TKTC) │
+            │ 0. 🏛️ cad_hop_phuong_an    │          │ 3. 📐 cad_hoan_thien_ho_so │
+            │ (Hội đồng AI họp phản biện)│          │ (Dàn trang động theo TKTC) │
             │                            │          │                            │
-            │ 2. 🔧 cad_chinh_sua        │          │ 4. 📊 cad_du_toan          │
-            │ (Sửa, dịch tường, đổi cửa) │          │ (Bóc dự toán chi tiết Excel│
+            │ 1. ✍️ cad_ve_moi           │          │ 4. 📊 cad_du_toan          │
+            │ (Vẽ mới không gian/tường)  │          │ (Bóc dự toán chi tiết Excel│
             │                            │          │                            │
-            │ 8. 📚 cad_tra_cuu_quy_chuan│          │ 7. 🖨️ cad_in_pdf           │
-            │ (Tra cứu quy chuẩn tức thì)│          │ (In PDF đen trắng nét chuẩn│
+            │ 2. 🔧 cad_chinh_sua        │          │ 7. 🖨️ cad_in_pdf           │
+            │ (Sửa, dịch tường, đổi cửa) │          │ (In PDF đen trắng nét chuẩn│
+            │                            │          │                            │
+            │ 8. 📚 cad_tra_cuu_quy_chuan│          │ 5. 🔍 cad_kiem_tra (Đo/lỗi)│
+            │ (Tra cứu quy chuẩn tức thì)│          │ 6. ⚡ cad_gui_lenh (Lệnh CAD│
             └────────────────────────────┘          └────────────────────────────┘
-                                 │                               │
-                                 ├───────────────────────────────┤
-                                 │ 5. 🔍 cad_kiem_tra (Đo/lỗi)   │
-                                 │ 6. ⚡ cad_gui_lenh (Lệnh CAD) │
-                                 └───────────────────────────────┘
 ```
 
 ---
