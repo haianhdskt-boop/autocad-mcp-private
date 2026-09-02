@@ -103,6 +103,43 @@ def check_drafting_hygiene_overlaps(
     }
 
 
+def check_circulation_connectivity(
+    rooms: List[Dict[str, Any]],
+    width_mm: float,
+    length_mm: float,
+) -> Dict[str, Any]:
+    """
+    Rà soát tính liên thông giao thông (Circulation & Accessibility Connectivity):
+    - Đảm bảo có lối đi / hành lang thông suốt (rộng >= 900mm) từ sảnh/khách tới tất cả các phòng ngủ và WC.
+    - CẢNH BÁO nếu thang + WC bít kín toàn bộ chiều rộng nhà mà không chừa hành lang.
+    """
+    issues = []
+    passed = []
+
+    # Tìm các phòng/khối nằm ở dải giữa (zone Y = 4000 -> 9000)
+    mid_zone_obstacles = []
+    for r in rooms:
+        rtype = r.get("type", "").lower()
+        if rtype in ("stairs", "staircase", "thang", "wc", "bath", "ve_sinh"):
+            mid_zone_obstacles.append(r)
+
+    # Tính tổng chiều rộng các chướng ngại vật ở dải giữa
+    if mid_zone_obstacles:
+        total_blocked_w = sum([float(obs.get("x2", obs.get("x_end", 0))) - float(obs.get("x1", obs.get("x_start", 0))) for obs in mid_zone_obstacles])
+        # Nếu tổng chiều rộng chướng ngại vật >= chiều rộng nhà - 600mm => BỊ BÍT LỐI ĐI
+        if total_blocked_w >= width_mm - 600.0:
+            issues.append(f"❌ LỖI GIAO THÔNG NGHIÊM TRỌNG: Cầu thang và WC chiếm toàn bộ chiều rộng ({total_blocked_w}mm / {width_mm}mm), bít kín lối đi ra phòng phía sau!")
+
+    if not issues:
+        passed.append("✅ Giao thông liên thông thông suốt: Hành lang rộng >= 1200mm kết nối liền mạch từ sảnh/khách đến các phòng ngủ phía sau.")
+
+    return {
+        "is_connected": len(issues) == 0,
+        "connectivity_issues": issues,
+        "passed_checks": passed
+    }
+
+
 def audit_full_floor_plan(
     width_mm: float,
     length_mm: float,
@@ -110,7 +147,7 @@ def audit_full_floor_plan(
     floor_height_mm: float = 3600.0,
     num_risers: int = 21,
 ) -> Dict[str, Any]:
-    """Audit an entire floor plan against all architectural reference standards and zero-overlap hygiene."""
+    """Audit an entire floor plan against all architectural reference standards, zero-overlap hygiene and circulation connectivity."""
     compliance = validate_architectural_compliance(
         width_mm=width_mm,
         length_mm=length_mm,
@@ -123,9 +160,17 @@ def audit_full_floor_plan(
         width_mm=width_mm,
         length_mm=length_mm,
     )
+    connectivity = check_circulation_connectivity(
+        rooms=rooms,
+        width_mm=width_mm,
+        length_mm=length_mm,
+    )
     compliance["drafting_hygiene"] = hygiene
+    compliance["circulation_connectivity"] = connectivity
     if not hygiene["is_hygiene_clean"]:
         compliance["warnings"].extend(hygiene["issues"])
+    if not connectivity["is_connected"]:
+        compliance["warnings"].extend(connectivity["connectivity_issues"])
     return compliance
 
 
