@@ -121,42 +121,48 @@ def dispatch_to_autocad_mac(commands: List[str]) -> Dict[str, Any]:
         subprocess.run(["osascript", "-e", activate_script],
                         capture_output=True, text=True, timeout=5)
 
-        # Step 2: Cancel any pending command with Escape
-        subprocess.run(
-            ["osascript", "-e",
-             'tell application "System Events" to key code 53'],  # Escape
-            capture_output=True, text=True,
-        )
-        subprocess.run(
-            ["osascript", "-e", 'delay 0.3'],
-            capture_output=True, text=True,
-        )
-
-        # Step 3: Tắt FILEDIA để SCRIPT không mở file dialog
-        # Dùng clipboard paste thay vì keystroke
-        _paste_text_to_cad("_FILEDIA\n0\n")
-        subprocess.run(
-            ["osascript", "-e",
-             'tell application "System Events" to keystroke return'],
-            capture_output=True, text=True,
-        )
-        subprocess.run(["osascript", "-e", 'delay 0.5'],
-                        capture_output=True, text=True)
-
-        # Step 4: Chạy SCRIPT với đường dẫn file (qua clipboard paste)
-        script_cmd = f"_SCRIPT\n{scr_file}\n"
-        _paste_text_to_cad(script_cmd)
-        subprocess.run(
-            ["osascript", "-e",
-             'tell application "System Events" to keystroke return'],
-            capture_output=True, text=True,
-        )
+        # Step 2: Gửi phím trực tiếp bằng AppleScript Keystroke vào AutoCAD Command Bar
+        keystroke_script = f'''
+        tell application "System Events"
+            set cadProc to (first process whose name contains "AutoCAD" \
+                or name contains "ZWCAD" or name contains "BricsCAD")
+            set frontmost of cadProc to true
+            delay 0.3
+            -- Cancel any pending command with Escape
+            key code 53
+            delay 0.1
+            key code 53
+            delay 0.2
+            -- Tắt hộp thoại file để nhận đường dẫn qua command line
+            keystroke "_FILEDIA" & return
+            delay 0.1
+            keystroke "0" & return
+            delay 0.2
+            -- Nạp và chạy file script kịch bản trực tiếp
+            keystroke "_SCRIPT" & return
+            delay 0.2
+            keystroke "{scr_file}" & return
+            delay 0.8
+            -- Bật lại dialog
+            keystroke "_FILEDIA" & return
+            delay 0.1
+            keystroke "1" & return
+            delay 0.2
+            -- Zoom Extents
+            keystroke "._zoom" & return
+            delay 0.1
+            keystroke "_e" & return
+        end tell
+        '''
+        res = subprocess.run(["osascript", "-e", keystroke_script],
+                             capture_output=True, text=True, timeout=15)
 
         return {
             "status": "success",
-            "message": "Đã thực thi trực tiếp trên màn hình CAD (macOS) qua clipboard paste.",
+            "message": "Đã thực thi trực tiếp trên màn hình AutoCAD đang mở qua AppleScript Keystroke.",
             "command_count": len([l for l in scr_lines if l.strip()]),
             "script_file": scr_file,
+            "osascript_result": res.returncode,
         }
 
     except Exception as e:
