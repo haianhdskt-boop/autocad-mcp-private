@@ -168,20 +168,65 @@ def dispatch_to_autocad_mac(commands: List[str]) -> Dict[str, Any]:
         }
 
 
+def _find_mac_cad_app() -> str | None:
+    """Detect installed or running CAD application on macOS."""
+    import glob
+    # 1. Check running CAD process
+    try:
+        res = subprocess.run(
+            ["osascript", "-e", 'tell application "System Events" to get POSIX path of (file of every process whose name contains "AutoCAD" or name contains "ZWCAD" or name contains "BricsCAD")'],
+            capture_output=True, text=True, timeout=5
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            paths = [p.strip() for p in res.stdout.strip().split(",") if p.strip()]
+            if paths:
+                return paths[0]
+    except Exception:
+        pass
+
+    # 2. Check standard Applications paths
+    patterns = [
+        "/Applications/Autodesk/AutoCAD */AutoCAD *.app",
+        "/Applications/AutoCAD *.app",
+        "/Applications/ZWCAD *.app",
+        "/Applications/BricsCAD *.app",
+    ]
+    for pat in patterns:
+        matches = glob.glob(pat)
+        if matches:
+            return sorted(matches, reverse=True)[0]
+    return None
+
+
 def open_dxf_in_autocad_mac(dxf_path: str) -> Dict[str, Any]:
-    """Open a DXF file directly using macOS 'open' command."""
+    """Open a DXF file in AutoCAD for Mac and bring AutoCAD to foreground."""
     if not os.path.exists(dxf_path):
         return {"status": "error", "message": f"File not found: {dxf_path}"}
     
+    cad_app = _find_mac_cad_app()
     try:
-        subprocess.run(["open", dxf_path], check=True)
+        if cad_app:
+            subprocess.run(["open", "-a", cad_app, dxf_path], check=True)
+        else:
+            subprocess.run(["open", dxf_path], check=True)
+            
+        # Bring CAD window to front
+        activate_script = '''
+        tell application "System Events"
+            set cadProc to (first process whose name contains "AutoCAD" or name contains "ZWCAD" or name contains "BricsCAD")
+            set frontmost of cadProc to true
+        end tell
+        '''
+        subprocess.run(["osascript", "-e", activate_script], capture_output=True, text=True, timeout=5)
+
         return {
             "status": "success",
-            "message": f"Đã xuất file DXF và gọi macOS mở tệp {dxf_path} (chạy ngầm, không gõ phím).",
-            "dxf_file": dxf_path
+            "message": f"Đã mở file DXF {dxf_path} trên AutoCAD và đưa cửa sổ lên màn hình chính.",
+            "dxf_file": dxf_path,
+            "cad_app": cad_app or "Default System CAD Viewer"
         }
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Lỗi khi mở tệp: {str(e)}"
+            "message": f"Lỗi khi mở tệp trên CAD: {str(e)}"
         }
