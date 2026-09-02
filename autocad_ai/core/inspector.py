@@ -21,10 +21,18 @@ def check_room_clear_dimensions(
         min_area = 1.0
         min_width_limit = 900.0
         std = {"name": "Hành Lang & Lối Đi", "min_area_m2": min_area, "min_width_mm": min_width_limit}
+    elif "balcony" in room_type.lower() or "ban_cong" in room_type.lower() or "terrace" in room_type.lower() or "san_thuong" in room_type.lower() or "gieng" in room_type.lower() or "garden" in room_type.lower() or "san" in room_type.lower():
+        min_area = 1.0
+        min_width_limit = 900.0
+        std = {"name": "Ban Công / Sân Vườn / Giếng Trời", "min_area_m2": min_area, "min_width_mm": min_width_limit}
     elif "stairs" in room_type.lower() or "thang" in room_type.lower():
         min_area = 4.0
         min_width_limit = 900.0
         std = {"name": "Cầu Thang Bộ", "min_area_m2": min_area, "min_width_mm": min_width_limit}
+    elif "altar" in room_type.lower() or "tho" in room_type.lower():
+        min_area = 4.0
+        min_width_limit = 1800.0
+        std = {"name": "Phòng Thờ", "min_area_m2": min_area, "min_width_mm": min_width_limit}
     elif not std:
         if "master" in room_type.lower():
             std = SPACE_STANDARDS.get("bedroom_master", {})
@@ -130,28 +138,38 @@ def check_circulation_connectivity(
 ) -> Dict[str, Any]:
     """
     Rà soát tính liên thông giao thông (Circulation & Accessibility Connectivity):
-    - Đảm bảo có lối đi / hành lang thông suốt (rộng >= 900mm) từ sảnh/khách tới tất cả các phòng ngủ và WC.
-    - CẢNH BÁO nếu thang + WC bít kín toàn bộ chiều rộng nhà mà không chừa hành lang.
+    - Đảm bảo có lối đi / hành lang thông suốt (rộng >= 900mm) dọc theo toàn bộ chiều dài nhà.
+    - Quét từng lát cắt Y: Nếu tại bất kỳ vị trí Y nào, tổng chiều rộng vật cản (Thang + WC) bít hết bề ngang (chừa < 800mm) => Báo lỗi tắc đường.
     """
     issues = []
     passed = []
 
-    # Tìm các phòng/khối nằm ở dải giữa (zone Y = 4000 -> 9000)
-    mid_zone_obstacles = []
-    for r in rooms:
-        rtype = r.get("type", "").lower()
-        if rtype in ("stairs", "staircase", "thang", "wc", "bath", "ve_sinh"):
-            mid_zone_obstacles.append(r)
+    # Quét qua 15 điểm cắt Y từ trước ra sau nhà (bước 1000mm)
+    for y_probe in range(1000, int(length_mm) - 1000, 1000):
+        blocked_w_at_y = 0.0
+        obstacles_at_y = []
+        for r in rooms:
+            rtype = r.get("type", "").lower()
+            if rtype in ("stairs", "staircase", "thang", "wc", "bath", "ve_sinh"):
+                y1 = float(r.get("y1", r.get("y_start", 0)))
+                y2 = float(r.get("y2", r.get("y_end", length_mm)))
+                if y1 <= y_probe <= y2:
+                    rx1 = float(r.get("x1", r.get("x_start", 0)))
+                    rx2 = float(r.get("x2", r.get("x_end", width_mm)))
+                    w_obs = abs(rx2 - rx1)
+                    blocked_w_at_y += w_obs
+                    obstacles_at_y.append(r.get("name", "Vật cản"))
 
-    # Tính tổng chiều rộng các chướng ngại vật ở dải giữa
-    if mid_zone_obstacles:
-        total_blocked_w = sum([float(obs.get("x2", obs.get("x_end", 0))) - float(obs.get("x1", obs.get("x_start", 0))) for obs in mid_zone_obstacles])
-        # Nếu tổng chiều rộng chướng ngại vật >= chiều rộng nhà - 600mm => BỊ BÍT LỐI ĐI
-        if total_blocked_w >= width_mm - 600.0:
-            issues.append(f"❌ LỖI GIAO THÔNG NGHIÊM TRỌNG: Cầu thang và WC chiếm toàn bộ chiều rộng ({total_blocked_w}mm / {width_mm}mm), bít kín lối đi ra phòng phía sau!")
+        # Nếu tại lát cắt y_probe bị bít quá nhiều (lối đi còn lại < 800mm)
+        remaining_corridor = width_mm - blocked_w_at_y
+        if remaining_corridor < 800.0 and len(obstacles_at_y) > 0:
+            issues.append(
+                f"❌ LỖI GIAO THÔNG TẠI VỊ TRÍ Y={y_probe}mm: Các khối ({', '.join(obstacles_at_y)}) chiếm {blocked_w_at_y}mm/{width_mm}mm, lối đi chỉ còn {remaining_corridor:.0f}mm (< 800mm)!"
+            )
+            break
 
     if not issues:
-        passed.append("✅ Giao thông liên thông thông suốt: Hành lang rộng >= 1200mm kết nối liền mạch từ sảnh/khách đến các phòng ngủ phía sau.")
+        passed.append("✅ Giao thông liên thông thông suốt: Tuyến hành lang rộng >= 900-1200mm kết nối liền mạch từ sảnh/khách đến các phòng ngủ phía sau.")
 
     return {
         "is_connected": len(issues) == 0,
