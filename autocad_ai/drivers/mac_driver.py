@@ -59,8 +59,8 @@ def is_autocad_running_mac() -> bool:
     return False
 
 
-def dispatch_to_autocad_mac(commands: List[str], batch_size: int = 25) -> Dict[str, Any]:
-    """Execute command list directly in active AutoCAD / ZWCAD / BricsCAD for Mac via direct AppleScript keystrokes."""
+def dispatch_to_autocad_mac(commands: List[str]) -> Dict[str, Any]:
+    """Execute command list directly in active AutoCAD / ZWCAD / BricsCAD for Mac via Native AutoLISP Bridge."""
     if not commands:
         return {"status": "error", "message": "No commands provided"}
 
@@ -73,78 +73,79 @@ def dispatch_to_autocad_mac(commands: List[str], batch_size: int = 25) -> Dict[s
         }
 
     try:
-        import time
+        # 1. Sinh file AutoLISP thực thi lệnh an toàn
+        lsp_dir = os.path.expanduser("~/.autocad_ai")
+        os.makedirs(lsp_dir, exist_ok=True)
+        lsp_file = os.path.join(lsp_dir, "ai_live_dispatch.lsp")
 
-        # 1. Activate CAD và Escape lệnh cũ
-        init_script = '''
+        lisp_lines = [
+            '(defun c:ai_run_dispatch ()',
+            '  (setvar "CMDECHO" 0)',
+            '  (setvar "OSMODE" 0)',
+        ]
+
+        for cmd in commands:
+            c = cmd.strip()
+            if not c:
+                continue
+            # Chuyển đổi lệnh AutoCAD sang AutoLISP command call
+            parts = c.split(" ")
+            lisp_parts = []
+            for p in parts:
+                if not p:
+                    continue
+                if "," in p:
+                    # Tọa độ X,Y -> (list X Y)
+                    coords = p.split(",")
+                    if len(coords) == 2:
+                        lisp_parts.append(f'(list {coords[0]} {coords[1]})')
+                    elif len(coords) == 3:
+                        lisp_parts.append(f'(list {coords[0]} {coords[1]} {coords[2]})')
+                    else:
+                        lisp_parts.append(f'"{p}"')
+                else:
+                    lisp_parts.append(f'"{p}"')
+            
+            lisp_lines.append(f'  (command {" ".join(lisp_parts)})')
+
+        lisp_lines.append('  (command "._ZOOM" "_E")')
+        lisp_lines.append('  (setvar "CMDECHO" 1)')
+        lisp_lines.append('  (princ "\\n✅ [AutoCAD AI] Đã thực thi hoàn tất lệnh vẽ trực tiếp!\\n")')
+        lisp_lines.append('  (princ)')
+        lisp_lines.append(')')
+        lisp_lines.append('(c:ai_run_dispatch)')
+
+        with open(lsp_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(lisp_lines) + "\n")
+
+        # 2. Gửi lệnh nạp AutoLISP trực tiếp vào cửa sổ AutoCAD
+        applescript = f'''
         tell application "System Events"
             set cadProc to (first process whose name contains "AutoCAD" \
                 or name contains "ZWCAD" or name contains "BricsCAD")
             set frontmost of cadProc to true
-            delay 0.2
+            delay 0.3
             key code 53 -- Escape
             delay 0.1
             key code 53
-        end tell
-        '''
-        subprocess.run(["osascript", "-e", init_script], capture_output=True, text=True, timeout=5)
-        time.sleep(0.2)
-
-        # 2. Gửi từng batch lệnh CAD trực tiếp
-        total = len(commands)
-        for i in range(0, total, batch_size):
-            batch = commands[i:i + batch_size]
-            lines = []
-            for cmd in batch:
-                c = cmd.strip()
-                if not c:
-                    lines.append('keystroke return')
-                else:
-                    escaped = c.replace('"', '\\"')
-                    lines.append(f'keystroke "{escaped}" & return')
-            
-            batch_script = f'''
-            tell application "System Events"
-                set cadProc to (first process whose name contains "AutoCAD" \
-                    or name contains "ZWCAD" or name contains "BricsCAD")
-                set frontmost of cadProc to true
-                {chr(10).join(lines)}
-            end tell
-            '''
-            subprocess.run(["osascript", "-e", batch_script], capture_output=True, text=True, timeout=10)
-            time.sleep(0.12)
-
-        # 3. Zoom Extents
-        final_script = '''
-        tell application "System Events"
-            set cadProc to (first process whose name contains "AutoCAD" \
-                or name contains "ZWCAD" or name contains "BricsCAD")
-            set frontmost of cadProc to true
             delay 0.2
-            key code 53
-            keystroke "._zoom _e" & return
+            keystroke "(load \\"{lsp_file}\\")" & return
         end tell
         '''
-        subprocess.run(["osascript", "-e", final_script], capture_output=True, text=True, timeout=5)
+        res = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True, timeout=10)
 
         return {
             "status": "success",
-            "message": "Đã vẽ trực tiếp từng nét lên màn hình AutoCAD đang mở qua Direct AppleScript Keystroke!",
-            "command_count": total,
+            "message": "Đã vẽ trực tiếp trên màn hình AutoCAD đang mở qua AutoLISP Live Bridge!",
+            "command_count": len(commands),
+            "lisp_file": lsp_file,
+            "returncode": res.returncode,
         }
 
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Lỗi dispatch lệnh trực tiếp: {str(e)}",
-        }
-
-    except Exception as e:
-        return {
-            "status": "partial_success",
-            "message": f"Script saved to {scr_file}, trigger note: {str(e)}",
-            "script_file": scr_file,
-            "how_to_run": f"In AutoCAD, type SCRIPT and choose {scr_file}",
+            "message": f"Lỗi dispatch AutoLISP: {str(e)}",
         }
 
 
